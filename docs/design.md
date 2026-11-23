@@ -13,7 +13,9 @@ move into a pane. The plugin is split accordingly:
   sandbox, verifies the agent binary, and attaches `sbx exec --interactive --tty`
   to the pane. When the agent exits, the pane's shell is back.
 
-The command typed into the pane is `env HERDR_AGENT=<kind> <node> <bridge> start ...`.
+On Windows, the bridge runs through the PowerShell call operator. Its command
+sets `HERDR_AGENT` for the bridge and restores the pane’s previous value on exit.
+On Unix, the command typed into the pane is `env HERDR_AGENT=<kind> <node> <bridge> start ...`.
 It starts with `env` rather than the `KEY=VALUE cmd` prefix because fish does
 not support that form, and `HERDR_AGENT` tells Herdr which screen manifest to
 apply to a process it cannot see through the sandbox boundary.

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Experimental Windows support with native PowerShell panes and Git for Windows.
+
 ## 0.1.0 - 2026-09-12
 
 Initial release.

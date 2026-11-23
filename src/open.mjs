@@ -16,6 +16,7 @@ export function openerCommand(env = process.env, platform = process.platform) {
   if (env[OPENER_ENV]) {
     return env[OPENER_ENV];
   }
+  if (platform === "win32") return "rundll32.exe";
   return platform === "darwin" ? "open" : "xdg-open";
 }
 
@@ -35,7 +36,8 @@ export function openerCommand(env = process.env, platform = process.platform) {
 export function openUrl(url, env = process.env, { graceMs = OPENER_GRACE_MS } = {}) {
   const command = openerCommand(env);
   return new Promise((resolve) => {
-    const child = spawn(command, [url], { env, stdio: "ignore", detached: true });
+    const args = process.platform === "win32" && !env[OPENER_ENV] ? ["url.dll,FileProtocolHandler", url] : [url];
+    const child = spawn(command, args, { env, stdio: "ignore", detached: true });
     const timer = setTimeout(() => resolve({ ok: true, command, error: null }), graceMs);
     child.once("error", (error) => {
       clearTimeout(timer);

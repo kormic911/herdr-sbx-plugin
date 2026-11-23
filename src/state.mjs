@@ -182,13 +182,20 @@ function processAlive(pid) {
 
 /**
  * A token that identifies one incarnation of a process: its start time as the
- * kernel reports it (Linux: field 22 of /proc/PID/stat; elsewhere: ps lstart).
+ * OS reports it (Linux /proc/PID/stat field 22, Windows StartTime ticks, or ps lstart).
  * A recycled pid carries a different token, so records that store a pid store
  * this next to it. Null when the platform cannot say.
  * @param {number} pid
  * @returns {string|null}
  */
 export function processStartToken(pid) {
+  if (process.platform === "win32") {
+    if (!Number.isSafeInteger(pid) || pid <= 0) return null;
+    const query = `(Get-Process -Id ${pid} -ErrorAction Stop).StartTime.ToUniversalTime().Ticks`;
+    const result = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", query], { encoding: "utf8", timeout: 5000, windowsHide: true });
+    const ticks = result.stdout?.trim();
+    return result.status === 0 && /^\d+$/.test(ticks) ? `win32:${ticks}` : null;
+  }
   try {
     const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
     const rest = stat.slice(stat.lastIndexOf(")") + 2).split(" ");

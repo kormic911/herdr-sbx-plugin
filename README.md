@@ -4,7 +4,7 @@ One coding agent per Docker Sandbox, driven from Herdr.
 
 [![Herdr plugin](https://img.shields.io/badge/herdr-plugin-76e6a3)](https://herdr.dev/plugins)
 [![Requires Herdr 0.9.0 or newer](https://img.shields.io/badge/herdr-%E2%89%A50.9.0-6db8ff)](https://herdr.dev/docs/plugins/)
-![Linux and macOS](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-f2c66d)
+![Linux, macOS and Windows](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-f2c66d)
 [![Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 [![CI](https://github.com/dirien/herdr-sbx-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/dirien/herdr-sbx-plugin/actions/workflows/ci.yml)
 
@@ -22,10 +22,9 @@ land in your checkout as they happen. Credentials never enter the VM: `sbx`
 injects them through a proxy on the way out. Outbound traffic is blocked unless
 you allow it.
 
-> **Boundary:** Linux or macOS, with `sbx` installed and signed in on the same
-> machine as Herdr. Verified with Herdr 0.9.0 and sbx 0.42.1 on macOS. There
-> is no Windows support, because the command typed into a pane assumes a
-> POSIX or fish shell.
+> Install and sign in to `sbx` on the machine running Herdr. The original
+> plugin was verified with Herdr 0.9.0 and sbx 0.42.1 on macOS. Native Windows
+> support in this fork is experimental.
 
 ## Requirements
 
@@ -34,7 +33,7 @@ you allow it.
 | [Herdr](https://herdr.dev) | 0.9.0 or newer (`min_herdr_version` in the manifest) |
 | [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/install/) | `sbx` 0.42 or newer, signed in with `sbx login` |
 | Node.js | 20 or newer; the plugin has no dependencies to install, and its only build step records where `node` lives |
-| Platform | Linux with KVM, or macOS on Apple silicon (what `sbx` needs) |
+| Platform | Linux with KVM, macOS on Apple silicon, or Windows 11 x64 with Windows Hypervisor Platform enabled |
 
 Install `sbx` with `brew trust docker/tap && brew install docker/tap/sbx` on
 macOS, or the `docker-sbx` apt package on Ubuntu. Then sign in and pick the
@@ -49,16 +48,32 @@ sbx policy init balanced   # or allow-all / deny-all
 
 Herdr ships everything else.
 
+### Windows setup
+
+Use native Windows Herdr, Node.js and `sbx` with a PowerShell pane. The plugin
+launcher and keybinding installer use Git for Windows. Make its `bin` directory
+(usually `C:\Program Files\Git\bin`) available on the PATH of the Herdr server.
+The default keybinding config is `%APPDATA%\herdr\config.toml`.
+Restart the server after changing PATH. Check the executables from PowerShell:
+
+```powershell
+Get-Command sh.exe, node.exe, git.exe, sbx.exe, herdr.exe
+sh -c 'command -v awk && node --version'
+```
+
+Docker's Windows installer is available with `winget install Docker.sbx`.
+See the [Docker Sandboxes installation instructions](https://docs.docker.com/ai/sandboxes/install/#windows)
+for the Windows Hypervisor Platform prerequisite. Sign in and initialize the
+network preset as above.
+
 ## Install
 
 ```bash
-herdr plugin install dirien/herdr-sbx-plugin
+herdr plugin install kormic911/herdr-sbx-plugin
 ```
 
 Herdr clones the repository and runs the manifest's build step,
-`scripts/write-node-path.sh`, which records where your `node` lives. Pin a
-release instead of the default branch with `--ref v0.1.0`, and pass `--yes` to
-skip the confirmation prompt.
+`scripts/write-node-path.sh`, which records where your `node` lives. Pass `--yes` to skip the confirmation prompt.
 
 Verify what got registered and that `sbx` answers:
 
@@ -72,7 +87,7 @@ For local development, link a checkout. `herdr plugin link` does not run the
 build step, so record the node path yourself:
 
 ```bash
-git clone https://github.com/dirien/herdr-sbx-plugin.git
+git clone https://github.com/kormic911/herdr-sbx-plugin.git
 cd herdr-sbx-plugin && sh scripts/write-node-path.sh
 herdr plugin link "$PWD"
 ```
@@ -333,7 +348,7 @@ add `denyNetwork` rules for hosts that must stay unreachable.
 Publish ports with the `publish` config key or `sbx ports <name> --publish`.
 `info` and the `sandboxes` overlay print each one as an `sbx://<sandbox>/<port>`
 link; Ctrl-click it in Herdr and the plugin opens `http://localhost:<host port>`
-with `open` on macOS or `xdg-open` elsewhere (override with `HERDR_SBX_OPENER`).
+with the registered browser on Windows, `open` on macOS or `xdg-open` on Linux (override with `HERDR_SBX_OPENER`).
 The opener runs detached: one that exits with an error within two seconds makes
 the result report `"opened":false`, while one still running then (a browser
 started in the foreground) counts as showing the page and is not waited for.

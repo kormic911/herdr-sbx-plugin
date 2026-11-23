@@ -6,6 +6,27 @@ executables. This checklist covers what only a real host can verify: the exact
 the agent's behaviour inside the VM. Work through it top to bottom; each step
 says what to run, what should happen, and what to write down when it does not.
 
+## Windows smoke test
+
+From a native PowerShell pane, check the Windows prerequisites in the README.
+From this fork’s checkout run:
+
+```powershell
+sh scripts/write-node-path.sh
+herdr plugin link "$PWD"
+herdr plugin action invoke doctor --plugin sbx.sandbox
+herdr plugin log list --plugin sbx.sandbox --limit 1
+```
+
+Check for `"ok":true` in the completed doctor log. Open a project with a space
+and an apostrophe in its name. Start an agent from a nested directory, then use
+`open-shell` and run `pwd` inside the guest. Verify that both sessions see the
+nested directory. While the shell is open, verify that deletion is refused.
+Exit the sessions, reconnect, and check that cancelling the deletion popup
+keeps the sandbox. In clone mode, make a commit and verify that `fetch-changes`
+makes it available on the host. Check that `open-port` opens the published URL
+in the Windows browser and `install-keybindings` reports the active Herdr config.
+
 ## Helper
 
 Actions return as soon as Herdr has started them; the outcome lands in the

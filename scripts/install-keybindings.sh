@@ -22,6 +22,8 @@ set -eu
 
 if [ -n "${HERDR_CONFIG_PATH:-}" ]; then
   config=$HERDR_CONFIG_PATH
+elif [ "${OS:-}" = Windows_NT ] && [ -n "${APPDATA:-}" ]; then
+  config=$APPDATA/herdr/config.toml
 elif [ -n "${XDG_CONFIG_HOME:-}" ]; then
   config=$XDG_CONFIG_HOME/herdr/config.toml
 elif [ -n "${HOME:-}" ]; then
@@ -29,6 +31,9 @@ elif [ -n "${HOME:-}" ]; then
 else
   printf 'warning: neither HERDR_CONFIG_PATH, XDG_CONFIG_HOME nor HOME is set; cannot find the Herdr config\n'
   exit 1
+fi
+if [ "${OS:-}" = Windows_NT ]; then
+  config=$(cygpath -m "$config")
 fi
 case "$config" in
   */*) config_dir=${config%/*} ;;
@@ -95,6 +100,9 @@ add_binding "prefix+shift+s" "open-shell" "open a shell in the Docker Sandbox"
 add_binding "prefix+shift+o" "sandboxes" "show the Docker Sandboxes overlay"
 
 herdr=${HERDR_BIN_PATH:-herdr}
+case "$herdr" in
+  *\\*) if [ "${OS:-}" = Windows_NT ]; then herdr=$(cygpath -u "$herdr"); fi ;;
+esac
 if ! command -v "$herdr" >/dev/null 2>&1; then
   rm -f "$backup"
   printf 'warning: %s is not available; run "herdr config check" and "herdr server reload-config" yourself\n' "$herdr"

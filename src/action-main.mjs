@@ -21,7 +21,7 @@ import { sandboxNameFor } from "./naming.mjs";
 import { openUrl } from "./open.mjs";
 import { emitResult, failurePayload } from "./result.mjs";
 import { createSbxClient } from "./sbx.mjs";
-import { buildPaneCommand, shellQuote } from "./shell.mjs";
+import { buildPaneCommand } from "./shell.mjs";
 import { deletePaneEntry, deletePaneEntryIfUnchanged, getPaneEntry, loadState, paneLockPath, savePaneEntry, withPaneLock } from "./state.mjs";
 
 /**
@@ -202,7 +202,7 @@ async function startBridge(deps, { paneId, mode, agent, label }) {
  * @returns {string}
  */
 export function keepBranchCommand(localPath, local, ref) {
-  return ["git", "-C", localPath, "branch", local, ref].map(shellQuote).join(" ");
+  return buildPaneCommand({ argv: ["git", "-C", localPath, "branch", local, ref] });
 }
 
 /**
@@ -427,7 +427,7 @@ function trackedNames(entry) {
  */
 export function parseKeybindingReport(text) {
   const report = { configPath: /** @type {string|null} */ (null), added: /** @type {Array<{key: string, action: string}>} */ ([]), existing: /** @type {Array<{key: string, action: string}>} */ ([]), warnings: /** @type {string[]} */ ([]), reloaded: false };
-  for (const line of text.split("\n")) {
+  for (const line of text.split(/\r?\n/)) {
     let match;
     if ((match = line.match(/^config: (.+)$/))) {
       report.configPath = match[1];

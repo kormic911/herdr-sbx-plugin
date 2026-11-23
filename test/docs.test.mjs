@@ -42,7 +42,7 @@ test("manifest header matches the code and package metadata", () => {
   assert.equal(field(tables.head, "id"), PLUGIN_ID);
   assert.equal(field(tables.head, "version"), pkg.version);
   assert.ok(field(tables.head, "min_herdr_version"));
-  assert.match(tables.head, /^platforms = \["linux", "macos"\]$/m);
+  assert.match(tables.head, /^platforms = \["linux", "macos", "windows"\]$/m);
   assert.ok(changelog.includes(`## ${pkg.version}`), "CHANGELOG has a heading for the current version");
 });
 

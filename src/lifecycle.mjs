@@ -29,6 +29,9 @@ export const CONNECTABLE_STATES = new Set(["prepared", "ready", "stopped"]);
  * @returns {string|null}
  */
 export function processCommandLine(pid) {
+  // Git for Windows ps reports MSYS processes and uses a different PID namespace.
+  // On Windows the native start token identifies the owner. An unknown owner stays busy.
+  if (process.platform === "win32") return null;
   try {
     return readFileSync(`/proc/${pid}/cmdline`, "utf8").replace(/\0/g, " ").trim();
   } catch {
@@ -175,7 +178,7 @@ export function assertMountRoot(localPath) {
   assertLocalPath(localPath);
   const resolved = canonicalPath(/** @type {string} */ (localPath));
   const forbidden = [path.parse(resolved).root, canonicalPath(homedir())];
-  if (forbidden.includes(resolved)) {
+  if (forbidden.some((directory) => path.relative(directory, resolved) === "")) {
     throw new PluginError("target", `Refusing to use ${resolved} as a sandbox workspace. Invoke start-agent from a project directory.`);
   }
   return resolved;
@@ -210,6 +213,16 @@ export function deletionTargets(entry) {
  */
 export function execWorkdir(entry) {
   return entry.workspaceMode === "clone" ? null : entry.workdir ?? entry.localPath;
+}
+
+/** Builds a guest command relative to sbx's primary workspace on Windows. */
+export function workspaceExecArgs(entry, options, platform = process.platform) {
+  const workdir = execWorkdir(entry);
+  const args = { sandboxName: entry.sandboxName, ...options };
+  if (platform !== "win32" || !workdir) return buildExecArgs({ ...args, workdir });
+  const relative = path.win32.relative(entry.localPath, workdir).replaceAll("\\", "/");
+  if (!relative) return buildExecArgs(args);
+  return buildExecArgs({ ...args, argv: ["sh", "-c", 'cd "./$1" && shift && exec "$@"', "sh", relative, ...args.argv] });
 }
 
 function describeError(error) {
@@ -316,7 +329,7 @@ export function createLifecycle({ stateDir, config, sbx = createSbxClient({ bin:
     if (agent.setupScript && (!reused || !entry.setupScriptRanAt)) {
       log(`Running the ${agent.title} setup script inside ${entry.sandboxName}...`);
       try {
-        const setup = sbx.runChecked(buildExecArgs({ sandboxName: entry.sandboxName, workdir: execWorkdir(entry), argv: [config.shell, "-lc", agent.setupScript] }), "running the agent setup script", { slow: true });
+        const setup = sbx.runChecked(workspaceExecArgs(entry, { argv: [config.shell, "-lc", agent.setupScript] }), "running the agent setup script", { slow: true });
         if (setup.output.trim() !== "") {
           log(setup.output.trim());
         }
@@ -330,7 +343,7 @@ export function createLifecycle({ stateDir, config, sbx = createSbxClient({ bin:
     }
     // Probe exactly the way the launch runs: same working directory, same
     // agentEnv, and a plain (non-login) sh so PATH matches a direct exec.
-    const probe = sbx.run(buildExecArgs({ sandboxName: entry.sandboxName, workdir: execWorkdir(entry), env: config.agentEnv, argv: ["sh", "-c", `command -v ${shellQuote(agent.command[0])}`] }));
+    const probe = sbx.run(workspaceExecArgs(entry, { env: config.agentEnv, argv: ["sh", "-c", `command -v ${shellQuote(agent.command[0])}`] }));
     if (probe.status !== 0) {
       // sbx exec fails for its own reasons too (daemon gone, VM did not boot,
       // credentials expired); only a silent miss means the command is absent.
@@ -364,7 +377,7 @@ export function createLifecycle({ stateDir, config, sbx = createSbxClient({ bin:
     }
     const workdir = execWorkdir(entry);
     log(`Launching ${label} in sandbox ${entry.sandboxName}${workdir ? ` (${workdir})` : ""}...`);
-    const args = buildExecArgs({ sandboxName: entry.sandboxName, workdir, interactive: true, tty: true, env, argv });
+    const args = workspaceExecArgs(entry, { interactive: true, tty: true, env, argv });
     let result;
     try {
       result = sbx.runInteractive(args);
@@ -907,7 +920,7 @@ export function createLifecycle({ stateDir, config, sbx = createSbxClient({ bin:
     const hostDir = mkdtempSync(path.join(tmpdir(), "herdr-sbx-"));
     const onHost = path.join(hostDir, "clone.bundle");
     try {
-      sbx.runChecked(buildExecArgs({ sandboxName: entry.sandboxName, argv: ["git", "-C", entry.localPath, "bundle", "create", inSandbox, "--branches"] }), "bundling the sandbox clone");
+      sbx.runChecked(buildExecArgs({ sandboxName: entry.sandboxName, argv: ["git", "-C", process.platform === "win32" ? "." : entry.localPath, "bundle", "create", inSandbox, "--branches"] }), "bundling the sandbox clone");
       sbx.runChecked(["cp", `${entry.sandboxName}:${inSandbox}`, onHost], "copying the bundle out of the sandbox");
       const fetch = runGit(["-C", entry.localPath, "fetch", "--verbose", onHost, `+refs/heads/*:refs/remotes/${remote}/*`], "git fetch from the sandbox bundle");
       const { output } = fetch;
