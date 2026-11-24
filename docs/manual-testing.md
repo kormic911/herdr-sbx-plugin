@@ -30,16 +30,15 @@ From this fork’s checkout run:
 
 ```powershell
 cargo build --release --locked
-herdr plugin link "$PWD"
-herdr plugin action invoke doctor --plugin sbx.sandbox
-herdr plugin log list --plugin sbx.sandbox --limit 1
+herdr plugin link .
+.\scripts\run-action.ps1 doctor
 ```
 
-Check for `"ok":true` in the completed doctor log. For the Rust launch check,
+Check the result for `"ok":true` and an `executable` path ending in `target\release\herdr-sbx.exe`. For the Rust launch check,
 focus a PowerShell pane in a project workspace and invoke
 `herdr plugin action invoke start-agent --plugin sbx.sandbox`.
 Wait for the agent prompt, then invoke `info` with that pane focused.
-The mapping should be ready. Invoke `open-shell` from this workspace. In the new pane, run `pwd` and then `exit`. These steps require neither Node nor Git Bash.
+The mapping should be ready. Invoke `open-shell` from this workspace. In the new pane, run `pwd` and then `exit`.
 Open a project with a space
 and an apostrophe in its name. Start an agent from a nested directory, then use
 `open-shell` and run `pwd` inside the guest. Verify that both sessions see the
@@ -71,7 +70,7 @@ Run these on the host, not inside a sandbox.
 ```bash
 sw_vers || cat /etc/os-release          # macOS 14+ on Apple silicon, or Ubuntu 24.04+ with /dev/kvm
 herdr --version                         # 0.9.0 or newer
-sbx version --json                      # 0.42 or newer; "server" must be present
+sbx version --json                      # 0.42 or newer
 sbx daemon status                       # running; otherwise: sbx daemon start
 sbx secret ls                           # an entry for your agent's API (anthropic, openai, ...)
 sbx policy ls                           # a preset must be chosen; deny-all needs: sbx policy allow network api.anthropic.com
@@ -105,25 +104,20 @@ cargo build --release --locked --manifest-path /path/to/herdr-sbx-plugin/Cargo.t
 herdr plugin link /path/to/herdr-sbx-plugin
 herdr plugin list
 herdr plugin action list --plugin sbx.sandbox
-CONFIG_DIR="$(herdr plugin config-dir sbx.sandbox)"
-printf '{ "agentKind": "claude-code" }\n' > "$CONFIG_DIR/config.json"
 ```
 
-Expect: `plugin list` shows `sbx.sandbox` enabled, `action list` shows fifteen
-actions on each platform. If linking fails with a version
-message, note the Herdr version: the manifest requires 0.9.0.
+Check that `sbx.sandbox` is enabled and lists fifteen actions. The examples below
+use the default Claude Code agent in mount mode. If you use another agent, select
+it in `edit-config` and substitute its name and command in the checks.
 
 ## 2. doctor
 
 ```bash
-herdr plugin action invoke doctor --plugin sbx.sandbox
-sleep 2
-herdr plugin log list --plugin sbx.sandbox --limit 1
+sbxrun doctor
 ```
 
-Expect: status `succeeded` and a first stdout line starting with
-`HERDR_SANDBOX_RESULT: {"schemaVersion":1,"plugin":"sbx.sandbox","action":"doctor","ok":true`
-followed by `version` and `daemon` fields. Nothing is created.
+Check the `HERDR_SANDBOX_RESULT:` line for `"ok":true`, the native
+`executable` path, and the `version` and `daemon` fields.
 
 If `ok` is false: `errorKind: "startup"` means `sbx` is not on the `PATH` Herdr
 started with (set `sbxBin` in `config.json`); `"daemon"` means `sandboxd` is not
@@ -135,8 +129,7 @@ Herdr has no menu for plugin actions; they run from a key binding or from the
 CLI. Add the plugin's five bindings and reload:
 
 ```bash
-herdr plugin action invoke install-keybindings --plugin sbx.sandbox
-herdr plugin log list --plugin sbx.sandbox --limit 1   # "added" lists five bindings the first time
+sbxrun install-keybindings   # check added, existing and warnings for the five shortcuts
 ```
 
 Press prefix then Shift+C, edit a field, save with S and reopen to verify the value.
@@ -173,14 +166,10 @@ focused workspace as context:
 herdr plugin action invoke start-agent --plugin sbx.sandbox
 ```
 
-Expect, within a minute or two:
-
-1. A new pane to the right titled `sbx claude-code`.
-2. The pane prints `Creating Docker Sandbox herdr-claude-code-<12 hex> for
-   ~/tmp/sbx-plugin-demo (agent claude, mount mode)...` followed by
-   the `sbx create` output.
-3. Claude Code's interface appears, and Herdr's pane status turns idle or
-   working after a few seconds.
+With the default split and agent settings, a pane opens to the right titled
+`sbx claude-code <short id>`. On first creation, the bridge prints the sandbox
+name and workspace path. Once the image is ready, the pane shows the launch
+message and the agent interface. Check that Herdr detects the agent.
 
 From another terminal:
 
@@ -198,7 +187,7 @@ What to record if it fails:
 - The pane shows an `unknown flag` or `unknown shorthand flag` error from
   `sbx exec`: copy the full command line. The bridge separates agent flags
   from `sbx` flags with `--`; this would mean the real CLI rejects that.
-- The pane shows `not available inside sandbox`: the template does not put
+- The bridge reports that the agent command is unavailable: the template does not put
   the agent on `PATH` for a login shell. Run step 7 and check
   `command -v claude` by hand.
 - Claude Code starts but Herdr's status never changes: run `info` (step 5)
@@ -215,43 +204,44 @@ ls ~/tmp/sbx-plugin-demo          # hello.txt is there immediately (mount mode)
 git -C ~/tmp/sbx-plugin-demo status
 ```
 
-Exit the agent. The pane prints `Claude Code exited with code <n>. Use
-reconnect to start it again or open-shell to inspect the sandbox.` and the
-shell prompt returns.
+Exit the agent and check that the pane returns to its host shell prompt.
 
 ## 5. info and list-sandboxes
 
 With the agent pane focused, run the `info` action, then `list-sandboxes`.
 
-Expect: `info` prints the mapping (sandbox name, `localPath`, `workdir`,
-`lifecycleState: "ready"`), the resolved `launchArgv`, and `sandbox.status`.
-`list-sandboxes` prints one tab-separated line per mapping ending in the
-sandbox status. `MISSING` next to a sandbox that `sbx ls` still shows means the
-JSON shape was not understood; attach the output from step 3.
+Check that `info` reports the sandbox name, `localPath`, `workdir`, the resolved
+`agent.launchArgv`, and the live sandbox status. Find the same sandbox in the
+`mappings` array from `list-sandboxes`. A missing sandbox has `exists: false`.
+If Docker inventory could not be read, `exists` is null and `sandboxError`
+explains the failure.
 
 ## 5b. The overlay and port links
 
-Run the `sandboxes` action (or `herdr plugin action invoke sandboxes --plugin
-sbx.sandbox`). Expect an overlay listing the sandbox with `running`, its pane
-id and `-` under PORTS; `q` closes it. Then publish a port and check the link:
+Open `sandboxes` (prefix then Shift+O). Select the demo sandbox with ↑/↓.
+Compare the Docker status with `sbx ls` and the mapping status with the open
+Herdr pane. Check the workspace and pane labels in the details panel. In a
+narrow terminal, press `i` to switch views. Press `q` to close the overlay.
 
-```bash
-sbx ports <sandbox name> --publish 8080:3000
+On the host, substitute the demo sandbox name and an available host port:
+
+```sh
+sbx port publish <sandbox-name> 127.0.0.1:8080:3000/tcp
+sbxrun info
 ```
 
-Run `info` from the agent pane: the output ends with a `port 3000:` line. In
-the overlay the PORTS column shows `8080->3000`; Ctrl-click it. Expect the
-browser to open `http://localhost:8080` (nothing listens there yet, which is
-fine). On Windows, the terminal opens the HTTP link directly. On Unix, check for a log entry for `open-port` with `"opened":true`. If Ctrl-click does
-nothing, note whether Herdr underlines the link at all: the OSC 8 hyperlink
-may not be recognized in your terminal.
+Check that `ports` maps guest port 3000 to host port 8080. Reopen the overlay
+and Ctrl-click the port link in the details panel. The browser should open
+`http://localhost:8080`. A connection error is expected if nothing is listening
+on guest port 3000. Windows opens the HTTP link directly. On Linux and macOS,
+Herdr handles the `sbx://` link through `open-port`.
 
 ## 6. reconnect
 
 Focus the agent pane (agent exited) and run `reconnect`. Expect the agent to
 start again in the same sandbox with `hello.txt` still present. Running
 `reconnect` while the agent is still up must be refused with
-`errorKind: "conflict"`.
+`errorKind: "conflict"`. Exit the agent before the shell checks.
 
 ## 7. open-shell
 
@@ -262,33 +252,26 @@ Run `open-shell` from the agent pane. Expect a pane below titled
 pwd                    # the demo repository path
 command -v claude      # the agent binary
 env | grep -c SANDBOX  # sandbox environment variables are present
-exit
 ```
+
+Leave this shell open for the next check.
 
 ## 7b. Ownership guards
 
 While the shell pane from step 7 is still open, run `forget-mapping` from the
 agent pane. Expect `errorKind: "conflict"` mentioning an open-shell session
-and no popup. `reconnect` from the agent pane must still work with the shell
-open; exit the agent again. While the agent is running, `forget-mapping` and
-`replace-sandbox` must also be refused with `conflict` (the bridge is alive),
-and a second `reconnect` too. Close the shell pane, then run `forget-mapping`
-once more to see the popup appear; cancel it.
-
-```bash
-ls "$(herdr plugin log list --plugin sbx.sandbox --limit 1 >/dev/null; herdr plugin action invoke doctor --plugin sbx.sandbox >/dev/null; sleep 2; herdr plugin log list --plugin sbx.sandbox --limit 1 | grep -o '"stateDir":"[^"]*"' | cut -d'"' -f4)/panes"
-```
-
-Expect one `.json` file per mapping and no `.lock` files left behind once no
-action is running.
+and no popup. With just the sandbox shell attached, reconnect the agent. While
+the agent is running, `forget-mapping`, `replace-sandbox` and a second
+`reconnect` must all return `conflict`. Exit both sessions, then invoke
+`forget-mapping` from the mapped pane and
+cancel the popup. Run `sbxrun doctor` to find `stateDir`. Its `panes/`
+directory should contain one JSON file per mapping.
 
 ## 8. stop, then reconnect
 
-With the agent still running, `stop` must be refused with `errorKind:
-"conflict"` (an `sbx stop` would kill the session with exit code 137). Exit the
-agent, then run `stop`. Expect a toast "Docker Sandbox stopped" and `sbx ls`
-showing the sandbox stopped. Run `reconnect`: the sandbox must start
-again on its own because `sbx exec` starts stopped sandboxes.
+Reconnect the agent and invoke `stop` while it is running. Expect a
+`conflict`. Exit the agent and run `stop` again. Check that `sbx ls` shows
+the sandbox stopped. Run `reconnect` and check that the same sandbox starts.
 
 ## 9. replace-sandbox
 
@@ -303,8 +286,7 @@ Exit the agent, then run `replace-sandbox`. A popup asks you to type `DELETE`.
 ## 10. forget-mapping
 
 Exit the agent and run `forget-mapping`, confirm with `DELETE`. Expect the
-sandbox gone from `sbx ls`, a toast "Docker Sandbox deleted", and
-`list-sandboxes` reporting `No sandbox mappings.`
+sandbox gone from `sbx ls` and its mapping absent from `list-sandboxes`.
 
 ## 11. The worktree.removed hook
 
@@ -324,24 +306,20 @@ herdr plugin log list --plugin sbx.sandbox --limit 1
 ```
 
 Expect a toast "Docker Sandboxes removed" and a log entry from the `worktree.removed` hook
-with `forgot mapping for pane ...`. To keep sandboxes on worktree removal, set
+with `Forgot mapping for pane ...`. To keep sandboxes on worktree removal, set
 `"cleanupOnWorktreeRemoved": false` and repeat: the log then says
 `leaving sandboxes alone`.
 
 ## 11b. Tab mode
 
-```bash
-printf '{ "agentKind": "claude-code", "openIn": "tab" }\n' > "$CONFIG_DIR/config.json"
-```
+In `edit-config`, set `openIn` to `tab` and save.
 
 Run `start-agent`. Expect a new tab in the workspace, labelled like the pane,
 with the agent inside; `reconnect` from that tab works as before.
 
 ## 12. Clone mode and fetch-changes
 
-```bash
-printf '{ "agentKind": "claude-code", "workspaceMode": "clone" }\n' > "$CONFIG_DIR/config.json"
-```
+In `edit-config`, set `workspaceMode` to `clone` and save.
 
 Run `start-agent` in the demo repository. In the agent pane, note the
 directory the agent reports as its working directory, then ask the agent to
@@ -365,9 +343,7 @@ host does not reach yet.
 With a Herdr workspace focused on the demo repository:
 
 ```bash
-herdr plugin action invoke start-agent --plugin sbx.sandbox
-until herdr plugin log list --plugin sbx.sandbox --limit 1 | grep -q '"status": *"\(succeeded\|failed\)"'; do sleep 1; done
-herdr plugin log list --plugin sbx.sandbox --limit 1 | grep -o 'HERDR_SANDBOX_RESULT: .*'
+sbxrun start-agent
 ```
 
 Expect the marker line with `paneId`, `sandboxName`, `localPath` and
@@ -376,10 +352,10 @@ the agent itself starts a little later.
 
 ## 14. Failure classification
 
-These confirm the error kinds against real `sbx` wording.
+Exit the agent from step 13. Use its disposable sandbox to check how the plugin handles a sandbox removed outside Herdr.
 
 ```bash
-sbx rm -f <sandbox name from list-sandboxes>       # delete behind the plugin's back
+sbx rm --force <sandbox-name-from-step-13>
 ```
 
 Run `stop` from that pane: expect `errorKind: "not-found"` and
@@ -396,10 +372,13 @@ Run `doctor`: expect `errorKind: "daemon"`. Start the daemon again afterwards.
 
 ```bash
 sbx ls
-sbx rm -f <any leftover herdr-* sandbox>
-herdr plugin unlink sbx.sandbox
-rm -rf ~/tmp/sbx-plugin-demo
 ```
+
+In the overlay, select each sandbox created by this checklist, exit any active
+agent or shell, then press `d`. Verify the listed name and type `DELETE`.
+For a stale mapping, `d` removes the mapping. Restore any settings changed
+during the checks, then unlink the checkout with `herdr plugin unlink sbx.sandbox`.
+Remove the throwaway repository when you are finished with it.
 
 ## What to report
 

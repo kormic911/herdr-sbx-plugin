@@ -55,23 +55,13 @@ impl Fixture {
     // Stage the current Cargo test binary in an isolated plugin checkout so
     // the manifest launcher uses the binary under test.
     fn plugin_root(&self) -> PathBuf {
-        let repo = Path::new(env!("CARGO_MANIFEST_DIR"));
         let root = self.path("linked plugin");
         let bin = root
             .join("target/release")
             .join(format!("herdr-sbx{}", std::env::consts::EXE_SUFFIX));
         if !bin.exists() {
             fs::create_dir_all(bin.parent().unwrap()).unwrap();
-            fs::create_dir_all(root.join("bin")).unwrap();
             fs::copy(PLUGIN, &bin).unwrap();
-            for script in [
-                "events.ps1",
-                "native-action.ps1",
-                "resolve-sbx.ps1",
-                "run-native.ps1",
-            ] {
-                fs::copy(repo.join("bin").join(script), root.join("bin").join(script)).unwrap();
-            }
         }
         root
     }
@@ -81,26 +71,18 @@ impl Fixture {
         let manifest = include_str!("../herdr-plugin.toml")
             .parse::<toml::Table>()
             .unwrap();
-        let platform = std::env::consts::OS;
         let event = manifest["events"]
             .as_array()
             .unwrap()
             .iter()
-            .find(|table| {
-                table["on"].as_str() == Some("worktree.removed")
-                    && table["platforms"]
-                        .as_array()
-                        .unwrap()
-                        .iter()
-                        .any(|v| v.as_str() == Some(platform))
-            })
+            .find(|table| table["on"].as_str() == Some("worktree.removed"))
             .unwrap();
         let mut argv = event["command"]
             .as_array()
             .unwrap()
             .iter()
             .map(|v| v.as_str().unwrap());
-        let mut cmd = Command::new(argv.next().unwrap());
+        let mut cmd = Command::new(root.join(argv.next().unwrap()));
         self.configure(&mut cmd);
         cmd.args(argv)
             .current_dir(root)
@@ -111,11 +93,10 @@ impl Fixture {
     }
 
     fn action(&self, name: &str) -> Value {
-        let root = self.plugin_root();
-        let mut cmd = Command::new(root.join("target/release/herdr-sbx"));
+        let mut cmd = Command::new(PLUGIN);
         self.configure(&mut cmd);
         let out = cmd
-            .current_dir(root)
+            .current_dir(self.dir.path())
             .arg("action")
             .env("HERDR_PLUGIN_ACTION_ID", name)
             .env("HERDR_PLUGIN_CONTEXT_JSON", r#"{"focused_pane_id":"p1"}"#)

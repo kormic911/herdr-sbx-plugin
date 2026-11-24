@@ -26,37 +26,11 @@ fn main() -> ExitCode {
     let mode = env::args().nth(1);
     let mode = if mode.as_deref() == Some("action") {
         let id = env::var("HERDR_PLUGIN_ACTION_ID").unwrap_or_default();
-        let command = if id == "sandboxes" {
-            "open-overlay"
+        Some(if id == "sandboxes" {
+            "open-overlay".into()
         } else {
-            &id
-        };
-        #[cfg(windows)]
-        {
-            // Keep long-running bridges on the staged copy so Cargo can rebuild.
-            return match std::process::Command::new("powershell.exe")
-                .args([
-                    "-NoLogo",
-                    "-NoProfile",
-                    "-ExecutionPolicy",
-                    "Bypass",
-                    "-File",
-                    "bin/native-action.ps1",
-                    command,
-                ])
-                .status()
-            {
-                Ok(status) => ExitCode::from(status.code().unwrap_or(1) as u8),
-                Err(error) => ExitCode::from(action::emit(
-                    &id,
-                    Err(sbx::Failure::new("startup", error.to_string())),
-                )),
-            };
-        }
-        #[cfg(not(windows))]
-        {
-            Some(command.to_owned())
-        }
+            id
+        })
     } else {
         mode
     };
@@ -107,11 +81,7 @@ fn main() -> ExitCode {
         Some("open-overlay") => ExitCode::from(action::emit("sandboxes", mapped::open_overlay())),
         Some("edit-config") => ExitCode::from(action::emit(
             "edit-config",
-            mapped::open_pane(if cfg!(windows) {
-                "config-editor-windows"
-            } else {
-                "config-editor"
-            }),
+            mapped::open_pane("config-editor"),
         )),
         Some("config-editor") => match editor::run() {
             Ok(()) => ExitCode::SUCCESS,

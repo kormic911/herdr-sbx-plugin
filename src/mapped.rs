@@ -39,12 +39,7 @@ fn herdr(args: &[&str]) -> Result<(), Failure> {
 
 pub fn open_overlay() -> ActionResult {
     action::context()?;
-    let id = if cfg!(windows) {
-        "sandboxes-windows"
-    } else {
-        "sandboxes"
-    };
-    open_pane(id)
+    open_pane("sandboxes")
 }
 
 pub fn open_pane(id: &str) -> ActionResult {

@@ -9,7 +9,7 @@
 ## Project
 
 Herdr plugin `sbx.sandbox` runs coding agents through the Docker Sandboxes CLI.
-The manifest starts the Rust executable or its platform launcher. `src/main.rs` dispatches actions, bridges, panes and events.
+The manifest starts the Rust executable. `src/main.rs` dispatches actions, bridges, panes and events.
 Mappings live in `HERDR_PLUGIN_STATE_DIR/panes/`. Configuration lives in `HERDR_PLUGIN_CONFIG_DIR/config.json`.
 
 ## Commands

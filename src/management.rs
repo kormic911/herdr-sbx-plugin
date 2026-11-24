@@ -186,11 +186,6 @@ impl Host {
         temp.persist_noclobber(&request).map_err(|e| e.error)?;
         let result = (|| {
             let deadline = Instant::now() + ttl;
-            let entry = if cfg!(windows) {
-                "deletion-confirmation-windows"
-            } else {
-                "deletion-confirmation"
-            };
             start::herdr(
                 &self.bin,
                 &[
@@ -200,7 +195,7 @@ impl Host {
                     "--plugin",
                     "sbx.sandbox",
                     "--entrypoint",
-                    entry,
+                    "deletion-confirmation",
                     "--env",
                     &format!("HERDR_SBX_CONFIRMATION_ID={id}"),
                     "--focus",

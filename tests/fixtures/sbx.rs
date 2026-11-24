@@ -199,11 +199,7 @@ fn main() -> ExitCode {
     } else if args.len() == 8
         && args[..6] == ["plugin", "pane", "open", "--plugin", "sbx.sandbox", "--entrypoint"]
         && args[7] == "--focus"
-        && (if cfg!(windows) {
-            ["sandboxes-windows", "config-editor-windows"]
-        } else {
-            ["sandboxes", "config-editor"]
-        }).contains(&args[6].as_str())
+        && ["sandboxes", "config-editor"].contains(&args[6].as_str())
     {
         println!(r#"{{"result":{{"type":"plugin_pane_opened"}}}}"#);
     } else if args == ["pane", "get", "p1"] {

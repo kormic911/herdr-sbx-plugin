@@ -375,6 +375,9 @@ its answer. From a checkout, `target/release/herdr-sbx run-action` invokes the a
 ./target/release/herdr-sbx run-action forget-mapping 120   # answer the popup in Herdr meanwhile
 ```
 
+From a Windows checkout, `.\scripts\run-action.ps1 info` waits for the same result.
+Use `.\scripts\install-keybindings.ps1` to install the shortcuts.
+
 Besides `schemaVersion`, `plugin`, `action` and `ok`, a successful line
 carries these fields:
 

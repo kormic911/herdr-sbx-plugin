@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Ship the plugin as a Rust executable on Windows, Linux and macOS. Remove the JavaScript runtime and Node.js requirement.
+- Ship the plugin as a Rust executable on Windows, Linux and macOS. Run actions, panes and the worktree hook directly on all three platforms.
 
 - Add a keyboard-driven settings popup bound to prefix+shift+c.
 
@@ -16,11 +16,11 @@
 
 - Launch a new sandbox and its configured agent with the native Rust action and pane bridge. Windows release installations use PowerShell.
 
-- Port mapping details, opening published ports, and the overlay action to Rust. Windows port links launch through PowerShell.
+- Port mapping details, opening published ports, and the overlay action to Rust.
 
 - Port the read-only `list-sandboxes` action to Rust.
 
-- Port the live read-only sandboxes overlay to Rust, including the Windows pane launcher.
+- Port the live sandboxes overlay to Rust.
 
 - Port the doctor action to Rust, including config validation and bounded sbx calls.
 - Begin the Rust port with the deletion-confirmation pane, verified release installers,

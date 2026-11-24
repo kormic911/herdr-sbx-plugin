@@ -163,14 +163,7 @@ fn overlay_action_opens_the_platform_pane_and_propagates_failures() {
     let f = Fixture::new();
     let v = f.run("open-overlay", json!({}), &[]);
     assert_eq!(v["action"], "sandboxes");
-    assert_eq!(
-        v["entrypoint"],
-        if cfg!(windows) {
-            "sandboxes-windows"
-        } else {
-            "sandboxes"
-        }
-    );
+    assert_eq!(v["entrypoint"], "sandboxes");
     assert_eq!(
         f.run(
             "open-overlay",
@@ -185,11 +178,7 @@ fn overlay_action_opens_the_platform_pane_and_propagates_failures() {
 fn edit_config_opens_the_settings_popup() {
     let f = Fixture::new();
     let v = f.run("edit-config", json!({}), &[]);
-    let pane = if cfg!(windows) {
-        "config-editor-windows"
-    } else {
-        "config-editor"
-    };
+    let pane = "config-editor";
     assert_eq!(v["ok"], true, "{v}");
     assert_eq!(v["entrypoint"], pane);
 }

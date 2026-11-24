@@ -119,19 +119,12 @@ contexts = ["global", "workspace", "pane"]
 command = ["./target/release/herdr-sbx", "action"]
 
 [[events]]
-platforms = ["linux", "macos"]
 on = "worktree.removed"
 command = ["./target/release/herdr-sbx", "worktree-removed"]
 # The hook opens the deletion-confirmation popup before it removes anything.
 
-[[events]]
-platforms = ["windows"]
-on = "worktree.removed"
-command = ["powershell.exe", "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "bin/events.ps1"]
-
 [[panes]]
 id = "deletion-confirmation"
-platforms = ["linux", "macos"]
 title = "Confirm sandbox deletion"
 placement = "popup"
 width = 74
@@ -139,45 +132,18 @@ height = 22
 command = ["./target/release/herdr-sbx", "deletion-confirmation"]
 
 [[panes]]
-id = "deletion-confirmation-windows"
-platforms = ["windows"]
-title = "Confirm sandbox deletion"
-placement = "popup"
-width = 74
-height = 22
-command = ["powershell.exe", "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "bin/confirmation.ps1"]
-
-[[panes]]
 id = "sandboxes"
-platforms = ["linux", "macos"]
 title = "Docker Sandboxes"
 placement = "overlay"
 command = ["./target/release/herdr-sbx", "sandboxes"]
 
 [[panes]]
-id = "sandboxes-windows"
-platforms = ["windows"]
-title = "Docker Sandboxes"
-placement = "overlay"
-command = ["powershell.exe", "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "bin/sandboxes.ps1"]
-
-[[panes]]
 id = "config-editor"
-platforms = ["linux", "macos"]
 title = "Docker Sandbox settings"
 placement = "popup"
 width = 76
 height = 22
 command = ["./target/release/herdr-sbx", "config-editor"]
-
-[[panes]]
-id = "config-editor-windows"
-platforms = ["windows"]
-title = "Docker Sandbox settings"
-placement = "popup"
-width = 76
-height = 22
-command = ["powershell.exe", "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "bin/run-native.ps1", "config-editor"]
 
 [[link_handlers]]
 id = "sandbox-port"

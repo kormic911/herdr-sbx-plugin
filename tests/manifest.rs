@@ -21,7 +21,12 @@ fn manifest_and_readme_match_the_native_plugin() {
     }
     for kind in ["build", "panes", "events"] {
         for entry in manifest[kind].as_array().unwrap() {
-            for arg in entry["command"].as_array().unwrap() {
+            let command = entry["command"].as_array().unwrap();
+            if kind != "build" {
+                assert_eq!(command[0].as_str(), Some("./target/release/herdr-sbx"));
+                assert!(entry.get("platforms").is_none());
+            }
+            for arg in command {
                 let arg = arg.as_str().unwrap();
                 if arg.starts_with("bin/") || arg.starts_with("scripts/") {
                     assert!(root.join(arg).is_file(), "Missing {arg}");
