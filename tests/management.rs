@@ -37,7 +37,9 @@ impl Fixture {
         ))
     }
     fn mapping(&self, id: &str, name: &str) -> Value {
-        let r = json!({"version":1,"paneId":id,"sandboxName":name,"agentKind":"claude-code","sbxAgent":"claude","workspaceMode":"mount","localPath":self.dir.path(),"workdir":self.dir.path(),"lifecycleState":"ready"});
+        // start-agent records canonical paths, including the resolved macOS temp directory.
+        let workspace = fs::canonicalize(self.dir.path()).unwrap();
+        let r = json!({"version":1,"paneId":id,"sandboxName":name,"agentKind":"claude-code","sbxAgent":"claude","workspaceMode":"mount","localPath":workspace,"workdir":workspace,"lifecycleState":"ready"});
         fs::write(self.rowfile(id), r.to_string()).unwrap();
         r
     }
@@ -61,6 +63,9 @@ impl Fixture {
             .join(format!("herdr-sbx{}", std::env::consts::EXE_SUFFIX));
         if !bin.exists() {
             fs::create_dir_all(bin.parent().unwrap()).unwrap();
+            #[cfg(unix)]
+            std::os::unix::fs::symlink(PLUGIN, &bin).unwrap();
+            #[cfg(windows)]
             fs::copy(PLUGIN, &bin).unwrap();
         }
         root
