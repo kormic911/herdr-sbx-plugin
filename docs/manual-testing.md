@@ -6,19 +6,41 @@ executables. This checklist covers what only a real host can verify: the exact
 the agent's behaviour inside the VM. Work through it top to bottom; each step
 says what to run, what should happen, and what to write down when it does not.
 
+## Automated native tests
+
+Run `cargo test --release --locked` for the native actions, confirmation popup and bridges.
+To test deletion against Docker Sandboxes on a signed-in host, run:
+
+```sh
+cargo test --release --locked --test management live_create_stop_delete -- --ignored --exact --nocapture
+```
+
+This creates a uniquely named sandbox in a temporary workspace, stops it, confirms deletion
+through the native popup, and checks the daemon inventory. The test drives the pane and popup
+using a fixture Herdr command. It prints the sandbox name before creation for recovery after interruption.
+
+To exercise the worktree removal hook against a disposable sandbox, run
+`cargo test --release --locked --test management live_create_worktree_cleanup -- --ignored --exact --nocapture`.
+The harness sends a worktree event through the platform manifest command and verifies the removal in the real daemon.
+
 ## Windows smoke test
 
 From a native PowerShell pane, check the Windows prerequisites in the README.
 From this fork’s checkout run:
 
 ```powershell
-sh scripts/write-node-path.sh
+cargo build --release --locked
 herdr plugin link "$PWD"
 herdr plugin action invoke doctor --plugin sbx.sandbox
 herdr plugin log list --plugin sbx.sandbox --limit 1
 ```
 
-Check for `"ok":true` in the completed doctor log. Open a project with a space
+Check for `"ok":true` in the completed doctor log. For the Rust launch check,
+focus a PowerShell pane in a project workspace and invoke
+`herdr plugin action invoke start-agent --plugin sbx.sandbox`.
+Wait for the agent prompt, then invoke `info` with that pane focused.
+The mapping should be ready. Invoke `open-shell` from this workspace. In the new pane, run `pwd` and then `exit`. These steps require neither Node nor Git Bash.
+Open a project with a space
 and an apostrophe in its name. Start an agent from a nested directory, then use
 `open-shell` and run `pwd` inside the guest. Verify that both sessions see the
 nested directory. While the shell is open, verify that deletion is refused.
@@ -48,7 +70,6 @@ Run these on the host, not inside a sandbox.
 
 ```bash
 sw_vers || cat /etc/os-release          # macOS 14+ on Apple silicon, or Ubuntu 24.04+ with /dev/kvm
-node --version                          # v20 or newer
 herdr --version                         # 0.9.0 or newer
 sbx version --json                      # 0.42 or newer; "server" must be present
 sbx daemon status                       # running; otherwise: sbx daemon start
@@ -80,6 +101,7 @@ git init -q && printf 'demo\n' > README.md && git add README.md && git commit -q
 ## 1. Link the plugin and check the manifest
 
 ```bash
+cargo build --release --locked --manifest-path /path/to/herdr-sbx-plugin/Cargo.toml
 herdr plugin link /path/to/herdr-sbx-plugin
 herdr plugin list
 herdr plugin action list --plugin sbx.sandbox
@@ -87,8 +109,8 @@ CONFIG_DIR="$(herdr plugin config-dir sbx.sandbox)"
 printf '{ "agentKind": "claude-code" }\n' > "$CONFIG_DIR/config.json"
 ```
 
-Expect: `plugin list` shows `sbx.sandbox` enabled, `action list` shows fourteen
-actions (`doctor` through `forget-mapping`). If linking fails with a version
+Expect: `plugin list` shows `sbx.sandbox` enabled, `action list` shows fifteen
+actions on each platform. If linking fails with a version
 message, note the Herdr version: the manifest requires 0.9.0.
 
 ## 2. doctor
@@ -110,12 +132,14 @@ running.
 ## 3. start-agent from the TUI
 
 Herdr has no menu for plugin actions; they run from a key binding or from the
-CLI. Add the plugin's four bindings and reload:
+CLI. Add the plugin's five bindings and reload:
 
 ```bash
 herdr plugin action invoke install-keybindings --plugin sbx.sandbox
-herdr plugin log list --plugin sbx.sandbox --limit 1   # "added" lists four bindings the first time
+herdr plugin log list --plugin sbx.sandbox --limit 1   # "added" lists five bindings the first time
 ```
+
+Press prefix then Shift+C, edit a field, save with S and reopen to verify the value.
 
 The same thing by hand, for one binding, is a block in Herdr's `config.toml`
 followed by a reload:
@@ -218,7 +242,7 @@ sbx ports <sandbox name> --publish 8080:3000
 Run `info` from the agent pane: the output ends with a `port 3000:` line. In
 the overlay the PORTS column shows `8080->3000`; Ctrl-click it. Expect the
 browser to open `http://localhost:8080` (nothing listens there yet, which is
-fine) and a log entry for `open-port` with `"opened":true`. If Ctrl-click does
+fine). On Windows, the terminal opens the HTTP link directly. On Unix, check for a log entry for `open-port` with `"opened":true`. If Ctrl-click does
 nothing, note whether Herdr underlines the link at all: the OSC 8 hyperlink
 may not be recognized in your terminal.
 
@@ -299,7 +323,7 @@ sbx ls                                    # the hook deleted the sandbox
 herdr plugin log list --plugin sbx.sandbox --limit 1
 ```
 
-Expect a toast "Docker Sandboxes removed" and a log entry from `src/events.mjs`
+Expect a toast "Docker Sandboxes removed" and a log entry from the `worktree.removed` hook
 with `forgot mapping for pane ...`. To keep sandboxes on worktree removal, set
 `"cleanupOnWorktreeRemoved": false` and repeat: the log then says
 `leaving sandboxes alone`.

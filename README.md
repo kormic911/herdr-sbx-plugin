@@ -2,11 +2,11 @@
 
 One coding agent per Docker Sandbox, driven from Herdr.
 
-[![Herdr plugin](https://img.shields.io/badge/herdr-plugin-76e6a3)](https://herdr.dev/plugins)
-[![Requires Herdr 0.9.0 or newer](https://img.shields.io/badge/herdr-%E2%89%A50.9.0-6db8ff)](https://herdr.dev/docs/plugins/)
-![Linux, macOS and Windows](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-f2c66d)
-[![Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
-[![CI](https://github.com/dirien/herdr-sbx-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/dirien/herdr-sbx-plugin/actions/workflows/ci.yml)
+[![Herdr plugin](https://img.shields.io/badge/herdr-plugin-76e6a3?style=for-the-badge)](https://herdr.dev/plugins)
+[![Requires Herdr 0.9.0 or newer](https://img.shields.io/badge/herdr-%E2%89%A50.9.0-6db8ff?style=for-the-badge)](https://herdr.dev/docs/plugins/)
+![Linux, macOS and Windows](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-f2c66d?style=for-the-badge)
+[![Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue?style=for-the-badge)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/kormic911/herdr-sbx-plugin/ci.yml?branch=main&label=CI&style=for-the-badge)](https://github.com/kormic911/herdr-sbx-plugin/actions/workflows/ci.yml)
 
 ![Your repository is mounted into a Docker Sandbox microVM; the plugin creates the sandbox, verifies the agent and attaches it to a Herdr pane; credentials are injected by the sbx proxy and never enter the VM.](docs/assets/herdr-sbx-plugin-hero.svg)
 
@@ -22,17 +22,12 @@ land in your checkout as they happen. Credentials never enter the VM: `sbx`
 injects them through a proxy on the way out. Outbound traffic is blocked unless
 you allow it.
 
-> Install and sign in to `sbx` on the machine running Herdr. The original
-> plugin was verified with Herdr 0.9.0 and sbx 0.42.1 on macOS. Native Windows
-> support in this fork is experimental.
-
 ## Requirements
 
 | | |
 | --- | --- |
 | [Herdr](https://herdr.dev) | 0.9.0 or newer (`min_herdr_version` in the manifest) |
 | [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/install/) | `sbx` 0.42 or newer, signed in with `sbx login` |
-| Node.js | 20 or newer; the plugin has no dependencies to install, and its only build step records where `node` lives |
 | Platform | Linux with KVM, macOS on Apple silicon, or Windows 11 x64 with Windows Hypervisor Platform enabled |
 
 Install `sbx` with `brew trust docker/tap && brew install docker/tap/sbx` on
@@ -46,25 +41,9 @@ sbx login
 sbx policy init balanced   # or allow-all / deny-all
 ```
 
-Herdr ships everything else.
-
-### Windows setup
-
-Use native Windows Herdr, Node.js and `sbx` with a PowerShell pane. The plugin
-launcher and keybinding installer use Git for Windows. Make its `bin` directory
-(usually `C:\Program Files\Git\bin`) available on the PATH of the Herdr server.
-The default keybinding config is `%APPDATA%\herdr\config.toml`.
-Restart the server after changing PATH. Check the executables from PowerShell:
-
-```powershell
-Get-Command sh.exe, node.exe, git.exe, sbx.exe, herdr.exe
-sh -c 'command -v awk && node --version'
-```
-
-Docker's Windows installer is available with `winget install Docker.sbx`.
-See the [Docker Sandboxes installation instructions](https://docs.docker.com/ai/sandboxes/install/#windows)
-for the Windows Hypervisor Platform prerequisite. Sign in and initialize the
-network preset as above.
+On Windows, install Docker Sandboxes with `winget install Docker.sbx` and enable
+Windows Hypervisor Platform as described in the [Windows setup guide](https://docs.docker.com/ai/sandboxes/install/#windows).
+Clone-mode fetch also requires Git on the host.
 
 ## Install
 
@@ -72,24 +51,26 @@ network preset as above.
 herdr plugin install kormic911/herdr-sbx-plugin
 ```
 
-Herdr clones the repository and runs the manifest's build step,
-`scripts/write-node-path.sh`, which records where your `node` lives. Pass `--yes` to skip the confirmation prompt.
+Herdr downloads the Rust binary for your platform and verifies its SHA-256 checksum.
+Pass `--yes` to skip the confirmation prompt. If the matching release is unavailable,
+build and link a checkout using the commands below.
 
 Verify what got registered and that `sbx` answers:
 
 ```bash
-herdr plugin action list --plugin sbx.sandbox         # fourteen actions
+herdr plugin action list --plugin sbx.sandbox         # fifteen actions per platform
 herdr plugin action invoke doctor --plugin sbx.sandbox
 herdr plugin log list --plugin sbx.sandbox --limit 1  # "ok":true in the first stdout line
 ```
 
 For local development, link a checkout. `herdr plugin link` does not run the
-build step, so record the node path yourself:
+build step, so build the binary first:
 
 ```bash
 git clone https://github.com/kormic911/herdr-sbx-plugin.git
-cd herdr-sbx-plugin && sh scripts/write-node-path.sh
-herdr plugin link "$PWD"
+cd herdr-sbx-plugin
+cargo build --release --locked
+herdr plugin link .
 ```
 
 ## First run
@@ -104,7 +85,7 @@ herdr plugin link "$PWD"
    sbx secret set anthropic    # prompts for the key
    ```
 
-2. Add the key bindings. This appends four `[[keys.command]]` entries to
+2. Add the key bindings. This appends five `[[keys.command]]` entries to
    Herdr's `config.toml` and reloads it, skipping entries that already exist:
 
    ```bash
@@ -112,12 +93,11 @@ herdr plugin link "$PWD"
    ```
 
 3. Open Herdr in a project and press `ctrl+b`, release, then `shift+a`. A pane
-   named `sbx claude-code <id>` appears, prints `Creating Docker Sandbox
-   herdr-claude-code-<id> for /your/project (agent claude, mount mode)...`, and
+   named `sbx claude-code <id>` appears, prints the sandbox name and project path, and
    Claude Code starts once the VM is up. Herdr shows it as working, blocked or
    idle like any local agent.
 
-4. When you leave the agent, the pane shows its exit code. Press `ctrl+b`,
+4. When you leave the agent, press `ctrl+b`,
    `shift+b` in that pane to bring it back into the same sandbox, or
    `ctrl+b`, `shift+s` for a shell inside the VM.
 
@@ -127,21 +107,22 @@ That is the whole loop. The rest of this document is reference.
 
 Every action is an entry point Herdr can bind or invoke; `herdr plugin action
 invoke <action> --plugin sbx.sandbox` runs one from any host terminal, and
-`sh scripts/run-action.sh <action>` does the same and waits for the result.
+the Rust binary’s `run-action <action>` command waits for its result.
 
 | Action | Context | What it does |
 | --- | --- | --- |
 | `doctor` | global, workspace, pane | Runs `sbx version` and `sbx daemon status`, prints the plugin's directories. Creates nothing. |
-| `install-keybindings` | global, workspace, pane | Appends the four key bindings listed below to Herdr's `config.toml` when they are missing, then reloads the config. |
+| `edit-config` | global, workspace, pane | Edit the plugin settings in a popup. |
+| `install-keybindings` | global, workspace, pane | Appends the five key bindings listed below to Herdr's `config.toml` when they are missing, then reloads the config. |
 | `start-agent` | workspace, pane | Creates a sandbox for the current worktree, opens a pane, launches the configured agent. |
 | `reconnect` | pane | Launches the mapped agent again in its sandbox, creating the sandbox first if it was never prepared. |
-| `open-shell` | pane | Splits a pane below the one you are in and opens a login shell inside the sandbox. |
+| `open-shell` | pane | Opens a sandbox login shell below the focused pane. If Herdr reports that the pane is gone, the Rust action opens the shell in a new tab. |
 | `fetch-changes` | pane | Brings a clone-mode sandbox's branches into the host repository as `sandbox-<name>/<branch>` refs. |
 | `stop` | pane | `sbx stop`. The filesystem is kept. |
 | `info` | pane | Prints the mapping, the resolved agent command, the live sandbox status and published ports. |
 | `list-sandboxes` | global, workspace, pane | Lists every mapping and flags sandboxes or panes that no longer exist. |
 | `prune-mappings` | global, workspace, pane | Drops mappings whose pane is gone and whose sandbox `sbx` no longer lists, then offers to delete sandboxes that still exist but lost their pane (popup, type DELETE). |
-| `sandboxes` | global, workspace, pane | Opens a live overlay of every sandbox: pane, agent, state, status, ports. `q` closes it. |
+| `sandboxes` | global, workspace, pane | Opens the interactive sandbox list. Select a row to reconnect, stop, delete, or remove a stale mapping. |
 | `open-port` | pane | Opens `http://localhost:<port>` for the focused sandbox's first published port, or for a Ctrl-clicked `sbx://<sandbox>/<port>` link. |
 | `replace-sandbox` | pane | Popup confirmation, `sbx rm --force`, then a fresh sandbox in the same pane. |
 | `forget-mapping` | pane | Popup confirmation, `sbx rm --force`, and the mapping is dropped. |
@@ -154,7 +135,7 @@ pane next to you and move the sandbox there (`adoptedFrom` in the result), and
 `list-sandboxes` marks such mappings with `pane gone`. When a pane exists but
 swallows the typed command, for example because it is not at a shell prompt,
 `reconnect` and `replace-sandbox` start in a fresh pane after four seconds
-instead (`movedTo`) and relabel the old one `(moved to ...)`. `reconnect`,
+instead (`movedTo`). `reconnect`,
 `replace-sandbox` and `forget-mapping` refuse to run while Herdr still detects
 an agent in the target pane, and so does `stop`, because `sbx stop` kills an
 attached session outright.
@@ -172,6 +153,9 @@ checkout, appends these entries to Herdr's `config.toml` and then runs
 | `prefix+shift+b` | `reconnect` |
 | `prefix+shift+s` | `open-shell` |
 | `prefix+shift+o` | `sandboxes` |
+| `prefix+shift+c` | `edit-config` |
+
+The settings popup reads the Herdr theme when it opens. Tab and Shift+Tab switch sections. Use Up/Down to select a setting. Enter opens the available choices or edits a value, and Left/Right cycles choices directly. Lists and custom profiles use JSON. Delete restores the selected default. From the field list, press S to save or Esc to discard changes. Subsequent plugin actions read the saved configuration.
 
 Each entry looks like this:
 
@@ -183,7 +167,7 @@ command = "sbx.sandbox.start-agent"
 description = "start an agent in a Docker Sandbox"
 ```
 
-Those four chords are unused by Herdr 0.9. `prefix+shift+d` and
+Those five chords are unused by Herdr 0.9. `prefix+shift+d` and
 `prefix+shift+r` look tempting but close the workspace and reload the config,
 so the installer leaves an existing binding on such a chord alone and reports
 it instead of replacing it. A chord that another command already uses is
@@ -345,14 +329,24 @@ add `denyNetwork` rules for hosts that must stay unreachable.
 
 ### Ports and the overlay
 
-Publish ports with the `publish` config key or `sbx ports <name> --publish`.
-`info` and the `sandboxes` overlay print each one as an `sbx://<sandbox>/<port>`
-link; Ctrl-click it in Herdr and the plugin opens `http://localhost:<host port>`
-with the registered browser on Windows, `open` on macOS or `xdg-open` on Linux (override with `HERDR_SBX_OPENER`).
+Open **Docker Sandboxes** with the Herdr prefix followed by **Shift+O**. Use **↑/↓** to select a row. The Docker column shows the sandbox status, and the Mapping column shows whether its Herdr pane still exists. The details pane on the right shows the selected sandbox’s workspace name, pane number and nickname, worktree, agent, and port links. In a narrow terminal, press **i** to switch between the list and details. The footer lists available commands, with action feedback on a separate line above it.
+
+| Selected row | Cleanup |
+| --- | --- |
+| Pane closed, sandbox still present | **r** reconnects, **s** stops a running sandbox, and **d** opens the deletion confirmation. Type `DELETE` there to delete the listed sandbox(s) and forget the mapping. |
+| Stale mapping | **d** removes the saved mapping after rechecking that the pane and every tracked sandbox are gone. |
+| Unverified | The overlay shows the inventory error and retries on refresh. Cleanup becomes available after both inventories can be verified. |
+
+Publish ports with the `publish` config key or `sbx port publish <name> <host-port>:<sandbox-port>`.
+On Windows, Ctrl-clicking a published port in `info` or the overlay opens
+`http://localhost:<host port>` directly in the default browser. On Linux and
+macOS, the terminal link uses `sbx://<sandbox>/<port>` and Herdr invokes
+`open-port`. To exercise the plugin's browser opener explicitly on Windows,
+invoke `open-port` from the mapped pane.
 The opener runs detached: one that exits with an error within two seconds makes
 the result report `"opened":false`, while one still running then (a browser
 started in the foreground) counts as showing the page and is not waited for.
-Links only work for sandboxes this plugin created and ports `sbx` reports as
+The `sbx://` handler only accepts sandboxes this plugin created and ports `sbx` reports as
 published, so text printed by an agent cannot steer your browser to another
 local service. The overlay refreshes every few seconds, keeps working while a
 command hangs, and closes on `q`.
@@ -374,13 +368,11 @@ herdr plugin log list --plugin sbx.sandbox --limit 1
 
 `invoke` returns as soon as Herdr has started the action, so the log entry may
 still say `running` for a moment, or for as long as a deletion popup waits for
-its answer. `scripts/run-action.sh` does the waiting for you: it invokes the
-action, polls the log, prints the result line plus the action's stderr, and
-exits 0 when `ok` is true.
+its answer. From a checkout, `target/release/herdr-sbx run-action` invokes the action, waits for its log entry, prints the result line and diagnostics, and exits successfully when `ok` is true.
 
 ```bash
-sh scripts/run-action.sh info
-sh scripts/run-action.sh forget-mapping 120   # answer the popup in Herdr meanwhile
+./target/release/herdr-sbx run-action info
+./target/release/herdr-sbx run-action forget-mapping 120   # answer the popup in Herdr meanwhile
 ```
 
 Besides `schemaVersion`, `plugin`, `action` and `ok`, a successful line
@@ -388,7 +380,7 @@ carries these fields:
 
 | Action | Fields |
 | --- | --- |
-| `doctor` | `sbxBin`, `node`, `pluginRoot`, `stateDir`, `configDir`, `version`, `versionWarning`, `daemon`, `agentKind`, `workspaceMode`, `template` |
+| `doctor` | `sbxBin`, `node` (null for Rust), `executable` (Rust binary path), `pluginRoot`, `stateDir`, `configDir`, `version`, `versionWarning`, `daemon`, `agentKind`, `workspaceMode`, `template` |
 | `install-keybindings` | `configPath`, `added` and `existing` (each entry has `key` and `action`), `warnings`, `reloaded` |
 | `start-agent` | `paneId`, `sourcePaneId`, `sandboxName`, `agentKind`, `localPath`, `workdir`, `workspaceMode`, `openIn`, `previousSandboxNames` |
 | `reconnect` | `paneId`, `sandboxName`, `agentKind`, `mode` (`connect`, or `start` when the sandbox still has to be prepared or the bridge was moved), `adoptedFrom` (the old pane id when a mapping whose pane was gone got a new one), `movedTo` (the new pane id when a live pane swallowed the typed command) |
@@ -397,7 +389,7 @@ carries these fields:
 | `stop` | `paneId`, `sandboxName` |
 | `info` | `paneId`, `mapping`, `agent`, `gitRemote`, `sandbox`, `sandboxError`, `ports`, `portsError` |
 | `prune-mappings` | `pruned`, `kept` (each with `paneId`, `sandboxName`, and a `reason` for kept ones), `deleted`, `failures` (deletions that failed after DELETE, each with `errorKind` and `message`), `orphansConfirmed` |
-| `sandboxes` | `entrypoint` |
+| `sandboxes`, `edit-config` | `entrypoint` |
 | `open-port` | `sandboxName`, `sandboxPort`, `hostPort`, `url`, `opened`, `opener` |
 | `list-sandboxes` | `mappings` (each with `paneId`, `paneExists` (`null` with a `paneError` when Herdr could not list its panes), `sandboxName`, `agentKind`, `localPath`, `workdir`, `workspaceMode`, `lifecycleState`, `exists`, `status`), `sandboxError` |
 | `replace-sandbox` | `paneId`, `sandboxName`, `agentKind`, `deleted`, `alreadyMissing`, `movedTo` |
@@ -436,10 +428,9 @@ Mappings live as one JSON file per pane under `panes/` in the plugin's state
 directory; `doctor` prints the path. Each file ties a Herdr pane id to a
 sandbox name, the mounted directory, the agent kind, and a lifecycle state:
 `provisional`, `creating`, `created`, `prepared`, `ready`, `stopped`,
-`missing` or `failed`. When Herdr hands out a pane id that still has a
-mapping, the old sandbox name is carried over so `forget-mapping` and
-`replace-sandbox` delete it too, and every deletion popup lists every sandbox
-it will remove. The worktree hook targets the mappings whose mounted directory
+`missing` or `failed`. If Herdr reuses a pane ID with an existing mapping,
+`start-agent` reports a conflict. Open the sandboxes overlay to inspect the
+old mapping before starting again. The worktree hook targets mappings whose mounted directory
 is exactly the removed worktree, and asks before deleting like every other
 deletion. Confirmation requests for the popup live next to the mappings under
 `confirmations/` and are swept automatically.
@@ -463,8 +454,7 @@ the plugin.
 
 Installing a Herdr plugin runs its commands as your user. Review
 [`herdr-plugin.toml`](herdr-plugin.toml) and the source before installing code
-you do not trust; this plugin runs `node`, `sbx`, `herdr` and `git`, nothing
-else.
+you do not trust. The Rust executable calls the host’s `sbx`, `herdr` and `git` commands.
 
 The sandbox boundary belongs to Docker Sandboxes, not to this plugin. What the
 plugin adds on top: it never runs a shell string built from repository content
@@ -483,10 +473,6 @@ use clone mode when that is more than you want to hand it.
 - Creating the first sandbox fails and the output mentions the network policy
   or a preset: run `sbx policy init balanced` once. `sbx` asks for the preset
   interactively before its first sandbox, and the plugin cannot answer for you.
-- A plugin action fails with "node was not found": run
-  `sh scripts/write-node-path.sh` in the plugin directory, or set
-  `HERDR_SBX_NODE` to your node binary in Herdr's environment. The manifest
-  starts every command through `bin/run.sh`, which prefers that recorded path.
 - The agent exits immediately: run `open-shell` and start the agent by hand
   to see its error. Common causes are a missing credential (`sbx secret ls`)
   or a blocked host (`sbx policy log`).
@@ -495,57 +481,10 @@ use clone mode when that is more than you want to hand it.
   another kind.
 - Herdr does not show the agent's status: the launch command must carry
   `HERDR_AGENT`; check `info` for the resolved `herdrDetectionKind`.
-- To reproduce a failure by hand, run the command the pane runs:
-  `node src/bridge.mjs start --state-dir <state dir> --config-dir <config dir> --pane-id <pane id>`
-  from the plugin directory; `doctor` prints both directories.
-
 ## Development
 
-```bash
-npm run check   # syntax check every module, then run the tests
-npm test
-```
-
-The tests run the real scripts as child processes against fake `sbx` and
-`herdr` executables in `test/fakes/`, so they need no Docker and no Herdr, only
-`git`. `docs/manual-testing.md` is the checklist for a machine that has both.
-
-| Path | Purpose |
-| --- | --- |
-| `herdr-plugin.toml` | Manifest: actions, the `worktree.removed` hook, the popup and overlay panes, the port link handler |
-| `bin/run.sh`, `scripts/write-node-path.sh` | Node shim and the build step that records the path of a Node 20+ binary |
-| `scripts/install-keybindings.sh` | Adds key bindings to the Herdr config and reloads it; the `install-keybindings` action runs it |
-| `scripts/run-action.sh` | Invokes an action from a terminal and waits for its result line |
-| `src/action.mjs` | Entry point that always prints the result marker |
-| `src/action-main.mjs` | Action handlers |
-| `src/context.mjs` | Herdr environment, invocation context, mount root rules |
-| `src/result.mjs`, `src/errors.mjs` | Result line and error kinds |
-| `src/naming.mjs`, `src/shell.mjs`, `src/constants.mjs` | Sandbox names, pane command quoting, constants |
-| `src/bridge.mjs`, `src/bridge-main.mjs` | Runs in the pane: create, verify, attach |
-| `src/events.mjs`, `src/events-main.mjs` | The `worktree.removed` hook |
-| `src/deletion-confirmation.mjs`, `src/confirmation-pane.mjs` | The popup |
-| `src/sandboxes-pane.mjs`, `src/sandboxes-pane-main.mjs` | The overlay |
-| `src/links.mjs`, `src/open.mjs` | `sbx://` port links and the browser opener |
-| `src/lifecycle.mjs` | Shared sandbox operations |
-| `src/sbx.mjs`, `src/herdr.mjs` | CLI wrappers and failure classification |
-| `src/agents.mjs` | Built-in adapters and custom agent validation |
-| `src/state.mjs`, `src/config.mjs`, `src/confirm.mjs` | Mapping store, config, popup handshake |
-| `docs/design.md` | Why it is built this way |
-
-## Status
-
-The current release is `v0.1.0`, matching the version in `package.json` and
-the plugin manifest. Pin to it with `--ref v0.1.0`; an install without
-`--ref` follows the default branch.
-
-Verified on a real host with Herdr 0.9.0 and sbx 0.42.1 on macOS: create,
-reconnect, shell, stop, replace, forget, the worktree hook, clone mode with
-`fetch-changes`, the overlay and the `sbx ls --json` shape. Still unverified:
-the exact wording of `sbx` errors; the failure classifier matches phrases such
-as `not found`, `not logged in` and `daemon`, and anything else lands in
-`unknown` with the output attached. `sbx ls --json` and `sbx ports --json`
-have no documented schema; the parsers accept the shapes seen so far and
-report anything else as an error rather than treating it as an empty list.
+Build with `cargo build --release --locked` and run the suite with `cargo test --locked`.
+See the [design notes](docs/design.md) for how actions and the pane bridge work.
 
 ## License
 

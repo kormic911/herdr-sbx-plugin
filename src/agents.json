@@ -1,0 +1,72 @@
+{
+  "claude-code": {
+    "title": "Claude Code",
+    "sbxAgent": "claude",
+    "command": [
+      "claude"
+    ],
+    "defaultArgs": [
+      "--dangerously-skip-permissions"
+    ],
+    "herdrDetectionKind": "claude",
+    "setupScript": null
+  },
+  "codex": {
+    "title": "Codex CLI",
+    "sbxAgent": "codex",
+    "command": [
+      "codex"
+    ],
+    "defaultArgs": [
+      "--dangerously-bypass-approvals-and-sandbox"
+    ],
+    "herdrDetectionKind": "codex",
+    "setupScript": null
+  },
+  "gemini": {
+    "title": "Gemini CLI",
+    "sbxAgent": "gemini",
+    "command": [
+      "gemini"
+    ],
+    "defaultArgs": [
+      "--yolo"
+    ],
+    "herdrDetectionKind": "gemini",
+    "setupScript": null
+  },
+  "opencode": {
+    "title": "OpenCode",
+    "sbxAgent": "opencode",
+    "command": [
+      "opencode"
+    ],
+    "defaultArgs": [],
+    "herdrDetectionKind": "opencode",
+    "setupScript": null
+  },
+  "copilot": {
+    "title": "GitHub Copilot CLI",
+    "sbxAgent": "copilot",
+    "command": [
+      "copilot"
+    ],
+    "defaultArgs": [
+      "--yolo"
+    ],
+    "herdrDetectionKind": "copilot",
+    "setupScript": null
+  },
+  "cursor": {
+    "title": "Cursor Agent",
+    "sbxAgent": "cursor",
+    "command": [
+      "cursor-agent"
+    ],
+    "defaultArgs": [
+      "--yolo"
+    ],
+    "herdrDetectionKind": "cursor",
+    "setupScript": null
+  }
+}

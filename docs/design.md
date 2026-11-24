@@ -6,16 +6,16 @@ Herdr runs plugin actions as short-lived child processes without a TTY and
 caps their captured output at 64 KiB. Anything interactive therefore has to
 move into a pane. The plugin is split accordingly:
 
-- `src/action.mjs` is what Herdr spawns. It resolves the invocation context,
+- `herdr-sbx action` is what Herdr spawns. It resolves the invocation context,
   talks to Herdr through `HERDR_BIN_PATH`, updates the mapping store, and prints
   the result marker line. It never blocks on a terminal.
-- `src/bridge.mjs` is typed into a pane by `herdr pane run`. It creates the
+- `herdr-sbx bridge-start` is typed into a pane by `herdr pane run`. It creates the
   sandbox, verifies the agent binary, and attaches `sbx exec --interactive --tty`
   to the pane. When the agent exits, the pane's shell is back.
 
 On Windows, the bridge runs through the PowerShell call operator. Its command
 sets `HERDR_AGENT` for the bridge and restores the pane’s previous value on exit.
-On Unix, the command typed into the pane is `env HERDR_AGENT=<kind> <node> <bridge> start ...`.
+On Unix, the command typed into the pane is `env HERDR_AGENT=<kind> <herdr-sbx> bridge-start ...`.
 It starts with `env` rather than the `KEY=VALUE cmd` prefix because fish does
 not support that form, and `HERDR_AGENT` tells Herdr which screen manifest to
 apply to a process it cannot see through the sandbox boundary.
@@ -50,17 +50,13 @@ Destructive actions open a `[[panes]]` entry with `placement = "popup"`. The
 action writes a request file, passes its id through `--env`, and polls for a
 decision file. The popup reads the request, asks the user to type `DELETE`,
 writes the decision, and exits; Ctrl-C in the popup records a cancellation.
-The action removes both files in a `finally` block, and every new request
-sweeps files older than twice the timeout, so a crashed popup leaves nothing
-behind. `replace-sandbox` resolves the agent, the mount root and the new name
+The action removes both files when the request completes, and sweeps expired requests when opening another popup. `replace-sandbox` resolves the agent, the mount root and the new name
 before it opens the popup, so nothing is deleted unless the replacement can be
 created.
 
 ## Why these choices
 
-- The plugin is plain Node with no dependencies. Every supported agent CLI is
-  an npm package, so Node is already on the machine, and the only build step
-  `herdr plugin install` runs records where that Node lives for the shim.
+- A single Rust executable handles actions, interactive panes and events. The install step downloads the release binary for the host platform and verifies its checksum.
 - Mount mode is the default because the bind mount removes the upload and
   patch round trip other sandbox plugins need. Clone mode is one config key away
   for people who want the agent isolated from the checkout.
@@ -91,8 +87,7 @@ created.
   handful of sandboxes would otherwise spawn a process per row per frame.
 - Ownership is explicit. Herdr's agent detection cannot see a bridge that is
   still inside `sbx create`, nor an `open-shell` session, so bridges, shells
-  and deletions record their own process (pid plus start time, verified by
-  command line) on the mapping. `destroy` claims the mapping before the first
+  and deletions record their own process (pid plus start time) on the mapping. `destroy` claims the mapping before the first
   `sbx rm` and re-reads it before every one; `acknowledgeBridge` and
   `acknowledgeShell` refuse while a claim is live. All of it happens under
   file locks: one per mapping, plus one per sandbox taken first in a fixed
@@ -103,10 +98,7 @@ created.
 
 ## Borrowed from other plugins
 
-The agentbox plugin for Herdr showed four things worth copying. Plugin
-commands start through `bin/run.sh`, a shim that prefers the node path
-recorded at install time, because Herdr's server may not share the shell's
-`PATH`. Agents without a screen manifest are announced to Herdr through
+The agentbox plugin inspired the agent reporting, overlay and link handling. Agents without a screen manifest are announced to Herdr through
 `pane report-agent` for the duration of the attach, so Herdr and the plugin's
 guards know the pane is taken. The `sandboxes` overlay pane gives a live view
 of every mapping, and `sbx://<sandbox>/<port>` links resolve through a
