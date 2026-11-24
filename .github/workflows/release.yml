@@ -21,6 +21,23 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: '3.13'
+      - name: Check release version
+        id: version
+        shell: python
+        run: |
+          import os, pathlib, tomllib
+          version = tomllib.loads(pathlib.Path("Cargo.toml").read_text())["package"]["version"]
+          manifest = tomllib.loads(pathlib.Path("herdr-plugin.toml").read_text())["version"]
+          if manifest != version:
+              raise SystemExit(f"Cargo.toml declares {version}, herdr-plugin.toml declares {manifest}")
+          tag = os.environ["GITHUB_REF_NAME"]
+          if os.environ["GITHUB_REF_TYPE"] == "tag" and tag != f"v{version}":
+              raise SystemExit(f"Tag {tag} points to plugin version {version}; expected v{version}")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              print(f"version={version}", file=output)
       - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
         with:
           targets: ${{ matrix.target }}
@@ -28,21 +45,14 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y musl-tools
       - run: cargo test --locked --target ${{ matrix.target }}
       - run: cargo build --locked --release --target ${{ matrix.target }}
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
-        with:
-          python-version: '3.13'
       - name: Package the versioned executable
         shell: python
         env:
           TARGET: ${{ matrix.target }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          import hashlib, os, pathlib, shutil, subprocess, tomllib
-          version = tomllib.loads(pathlib.Path("Cargo.toml").read_text())["package"]["version"]
-          manifest = tomllib.loads(pathlib.Path("herdr-plugin.toml").read_text())
-          if version != manifest["version"]:
-              raise SystemExit("Cargo and plugin manifest versions must match")
-          if os.environ["GITHUB_REF_TYPE"] == "tag" and os.environ["GITHUB_REF_NAME"] != f"v{version}":
-              raise SystemExit("Release tag must match the plugin version")
+          import hashlib, os, pathlib, shutil, subprocess
+          version = os.environ["VERSION"]
           target = os.environ["TARGET"]
           suffix = ".exe" if os.name == "nt" else ""
           binary = pathlib.Path("target", target, "release", "herdr-sbx" + suffix)
@@ -72,4 +82,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
-        run: gh release create "$TAG" dist/* --verify-tag --generate-notes
+        run: |
+          if gh release view "$TAG" > /dev/null; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --verify-tag --generate-notes
+          fi

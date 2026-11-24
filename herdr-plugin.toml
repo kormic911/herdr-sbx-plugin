@@ -1,6 +1,6 @@
 id = "sbx.sandbox"
 name = "Docker Sandboxes (sbx)"
-version = "0.1.0"
+version = "1.0.0"
 min_herdr_version = "0.9.0"
 description = "Run one coding agent per Docker Sandbox microVM, driven by the sbx CLI."
 platforms = ["linux", "macos", "windows"]

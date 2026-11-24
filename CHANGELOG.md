@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.0
 
 - Ship the plugin as a Rust executable on Windows, Linux and macOS. Run actions, panes and the worktree hook directly on all three platforms.
 
